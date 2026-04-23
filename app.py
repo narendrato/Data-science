@@ -73,7 +73,7 @@ def load_models():
     required_files = ["scaler.pkl", "pca.pkl", "kmeans.pkl", "columns.pkl"]
 
     # Debug: show files
-    st.write("📁 Files in directory:", os.listdir())
+    #st.write("📁 Files in directory:", os.listdir())
 
     missing_files = [f for f in required_files if not os.path.exists(f)]
 
