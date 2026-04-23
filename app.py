@@ -3,8 +3,24 @@ import pandas as pd
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-import pycountry
+import os
 from sklearn.impute import SimpleImputer
+
+# =========================
+# SAFE PYCOUNTRY IMPORT
+# =========================
+try:
+    import pycountry
+    def get_flag(country_name):
+        try:
+            country = pycountry.countries.search_fuzzy(country_name)[0]
+            code = country.alpha_2
+            return "".join(chr(127397 + ord(c)) for c in code)
+        except:
+            return ""
+except:
+    def get_flag(country_name):
+        return ""
 
 # =========================
 # PAGE CONFIG
@@ -33,17 +49,6 @@ body {background-color: #0f172a; color: white;}
 """, unsafe_allow_html=True)
 
 # =========================
-# FLAG FUNCTION
-# =========================
-def get_flag(country_name):
-    try:
-        country = pycountry.countries.search_fuzzy(country_name)[0]
-        code = country.alpha_2
-        return "".join(chr(127397 + ord(c)) for c in code)
-    except:
-        return ""
-
-# =========================
 # SIDEBAR
 # =========================
 st.sidebar.title("🌍 Global Dev Clustering")
@@ -64,31 +69,46 @@ menu = st.sidebar.radio("📊 Navigation", [
 # =========================
 @st.cache_resource
 def load_models():
-    with open("scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
 
-    with open("pca.pkl", "rb") as f:
-        pca = pickle.load(f)
+    required_files = ["scaler.pkl", "pca.pkl", "kmeans.pkl", "columns.pkl"]
 
-    with open("kmeans.pkl", "rb") as f:
-        kmeans = pickle.load(f)
+    # Debug: show files
+    st.write("📁 Files in directory:", os.listdir())
 
-    with open("columns.pkl", "rb") as f:
-        columns = pickle.load(f)
+    missing_files = [f for f in required_files if not os.path.exists(f)]
 
-    return scaler, pca, kmeans, columns
+    if missing_files:
+        st.error(f"❌ Missing files: {missing_files}")
+        st.stop()
 
-try:
-    scaler, pca, model, columns = load_models()
-except:
-    st.error("❌ Missing model files (.pkl)")
-    st.stop()
+    try:
+        with open("scaler.pkl", "rb") as f:
+            scaler = pickle.load(f)
+
+        with open("pca.pkl", "rb") as f:
+            pca = pickle.load(f)
+
+        with open("kmeans.pkl", "rb") as f:
+            model = pickle.load(f)
+
+        with open("columns.pkl", "rb") as f:
+            columns = pickle.load(f)
+
+    except Exception as e:
+        st.error(f"❌ Error loading model files: {e}")
+        st.stop()
+
+    return scaler, pca, model, columns
+
+
+scaler, pca, model, columns = load_models()
 
 # =========================
 # MAIN APP
 # =========================
 if uploaded_file:
 
+    # LOAD DATA
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
@@ -100,6 +120,9 @@ if uploaded_file:
 
     country_names = df["Country"]
 
+    # =========================
+    # COUNTRY FILTER
+    # =========================
     st.sidebar.markdown("### 🌐 Select Country")
 
     country_list = sorted(country_names.unique())
@@ -215,6 +238,9 @@ if uploaded_file:
         plt.colorbar(im)
         st.pyplot(fig)
 
+    # =========================
+    # FEATURE ANALYSIS
+    # =========================
     elif menu == "Feature Analysis":
 
         feature = st.selectbox("Select Feature", df_clean_filtered.columns)
@@ -228,6 +254,9 @@ if uploaded_file:
         ax.hist(df_clean_filtered[feature], bins=30)
         st.pyplot(fig)
 
+    # =========================
+    # CLUSTERING
+    # =========================
     elif menu == "Clustering Models":
 
         st.bar_chart(pd.Series(clusters_filtered).value_counts())
@@ -238,6 +267,9 @@ if uploaded_file:
 
         st.dataframe(df_filtered.head())
 
+    # =========================
+    # MODEL COMPARISON
+    # =========================
     elif menu == "Model Comparison":
 
         cluster_data = df_clean_filtered.copy()
@@ -245,14 +277,15 @@ if uploaded_file:
 
         st.dataframe(cluster_data.groupby("Cluster").mean())
 
+    # =========================
+    # COUNTRY EXPLORER
+    # =========================
     elif menu == "Country Explorer":
 
         if selected_country == "All Countries":
             st.warning("Please select a country")
         else:
-            row = df_filtered.iloc[0]
             row_clean = df_clean_filtered.iloc[0]
-
             st.markdown(f"### {get_flag(selected_country)} {selected_country}")
             st.write(row_clean)
 
